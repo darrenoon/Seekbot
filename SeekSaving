@@ -1,0 +1,204 @@
+// ==UserScript==
+// @name         Seek Saving
+// @namespace    http://tampermonkey.net/
+// @version      0.1
+// @description  try to take over the world!
+// @author       You
+// @match        https://www.seek.com.au/job/*
+// https://www.seek.com.au/job/*?savedSearchID*
+// @grant        none
+// @require      http://code.jquery.com/jquery-3.4.1.min.js
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Your code here...
+    $("document").ready(function(){
+        //var content = $("#3dee").text();
+
+    var PositionTitle = $("span[data-automation=job-detail-title]").first().text();
+    var CompanyName = $("span[data-automation=advertiser-name]").text();
+    //job-header-company-review-title
+    var ListedDate = $("dd[data-automation=job-detail-date]").first().text();
+    var Location = $("strong[class=lwHBT6d]:eq(1)").text();
+    var Category = $("strong[class=lwHBT6d]:eq(2)").text();
+    var SubCategory = $("span[class=eBOHjGN]:eq(0)").text().replace(", ","");
+    //var DescriptionText= $(".JyFVSRZ:eq(0)").text();
+    var DescriptionText = $("div[data-automation=jobDescription]:eq(0)").text();
+
+    var AdvertisersSiteItem = $("span[data-automation=job-detail-linkout-description]");
+    var AdvertisersSite = "default";
+        if(AdvertisersSiteItem.length != 0){
+            AdvertisersSite = "advertisers"
+        }
+
+    // replace html
+    var regex = /(<([^>]+)>)/ig
+    DescriptionText = DescriptionText.replace(regex,"")
+
+
+    var content =
+        PositionTitle + "\n" +
+        CompanyName+ "\n" +
+        ListedDate+ "\n" +
+        Location+ "\n"+
+        Category+ "\n" +
+        SubCategory+ "\n" +
+        DescriptionText
+
+
+    var ParsedContent = ''
+    ParseContent();
+
+    function ParseContent(){
+        //
+        // Lemmatizer
+
+        ParsedContent = content;
+        // word replacements
+        ParsedContent = ParsedContent.toLowerCase();
+        ParsedContent = ParsedContent.replace(/[^a-zA-Z]/ig," ")
+        ParsedContent = ParsedContent.replace(/ies /g,"y ")
+        ParsedContent = ParsedContent.replace(/(([^si])s )/g,"$2 ")
+        //ParsedContent = ParsedContent.replace("’","")
+        console.log(ParsedContent)
+
+    }
+
+    function ParseContentContains(searchparam){
+        return ParsedContent.includes(searchparam)
+
+    }
+
+     var WordReplacements = ""
+
+
+     var KeyWordsDictionary = [
+['intercept',-1.6572],
+['financialanalysis',0.9446],
+['financial',0.3891],
+['investment',0.9241],
+['model',0.7047],
+['market',0.1895],
+['commercial',0.2932],
+['analysis',0.9866],
+['excel',0.2603],
+['data',0.6688],
+['businessintelligence',0.4314],
+['analytics',0.1842],
+['strategy',0.3751],
+['informationtechnology',0.4298],
+['accounting',0.1039],
+['professionalaccountingqualification',-1.3288],
+['businessanalyst',-0.7221],
+['technical',-0.4211],
+['technology',-0.7369],
+['system',-0.4584],
+['agile',0.0294],
+['documentation',-0.2194],
+['advice',-1.0996],
+
+     ];
+
+
+    var logitValue = KeyWordsDictionary[0][1];
+    for(var i = 1; i < KeyWordsDictionary.length; i++){
+
+        if(ParseContentContains(KeyWordsDictionary[i][0])){
+            logitValue += KeyWordsDictionary[i][1]
+        }
+    }
+
+
+        setInterval(function() {
+            var SeekID = window.location.href.split("?")[0]
+            SeekID = SeekID.split("/")[4]
+            document.title = logit2prob(logitValue) + "||" + SeekID + "||" + AdvertisersSite + "||"
+        }, 0.1 * 1000); // 60 * 1000 milsec
+        console.log(logit2prob(logitValue))
+
+
+        $(document).keypress(function(e){
+        var keyPressed = String.fromCharCode(e.which);
+        if(keyPressed = ">"){
+            copyTextToClipboard(window.location.href + "\n" +content);
+        }
+
+    });
+
+    });
+
+    
+
+
+
+
+    function logit2prob(logit){
+        var odds = Math.exp(logit)
+        var prob = odds / (1 + odds)
+        return prob
+    }
+
+
+    function copyTextToClipboard(text) {
+        var textArea = document.createElement("textarea");
+
+        //
+        // *** This styling is an extra step which is likely not required. ***
+        //
+        // Why is it here? To ensure:
+        // 1. the element is able to have focus and selection.
+        // 2. if element was to flash render it has minimal visual impact.
+        // 3. less flakyness with selection and copying which **might** occur if
+        //    the textarea element is not visible.
+        //
+        // The likelihood is the element won't even render, not even a
+        // flash, so some of these are just precautions. However in
+        // Internet Explorer the element is visible whilst the popup
+        // box asking the user for permission for the web page to
+        // copy to the clipboard.
+        //
+
+        // Place in top-left corner of screen regardless of scroll position.
+        textArea.style.position = 'fixed';
+        textArea.style.top = 0;
+        textArea.style.left = 0;
+
+        // Ensure it has a small width and height. Setting to 1px / 1em
+        // doesn't work as this gives a negative w/h on some browsers.
+        textArea.style.width = '2em';
+        textArea.style.height = '2em';
+
+        // We don't need padding, reducing the size if it does flash render.
+        textArea.style.padding = 0;
+
+        // Clean up any borders.
+        textArea.style.border = 'none';
+        textArea.style.outline = 'none';
+        textArea.style.boxShadow = 'none';
+
+        // Avoid flash of white box if rendered for any reason.
+        textArea.style.background = 'transparent';
+
+
+        textArea.value = text;
+
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+            var successful = document.execCommand('copy');
+            var msg = successful ? 'successful' : 'unsuccessful';
+            console.log('Copying text command was ' + msg);
+        } catch (err) {
+            console.log('Oops, unable to copy');
+        }
+
+        document.body.removeChild(textArea);
+    }
+
+
+
+})();
